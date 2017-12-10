@@ -17,8 +17,14 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(cors('*'));
-
+app.use((req, res, next) =>{
+res.header ('Access-Control-Allow-Origin', 'http://localhost:3000 ')
+res.header ('Access-Control-Allow-Headers', 'Origin, X-Requested-With, X-AUTHENTICATION, X-IP, Content-Type, Accept')
+res.header ('Access-Control-Allow-Credentials', true)
+res.header ('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+next()
+})
+  
 app.get('/logout', function(req, res){
     req.logout();
     res.redirect('/');
@@ -37,7 +43,7 @@ app.post('/signin', (req, res, next) => {
                 console.error(err);
                 return next(err);
             }
-            return res.json({username: user.username, queries: user.queries});
+            return res.json({username: user.username, queries: user.queries, id: user.id});
         });
     })(req, res, next);
 });
@@ -55,30 +61,42 @@ app.post('/signup', (req, res, next) => {
                 console.error(err);
                 return next(err);
             }
-            return res.json({username: user.username});
+            return res.json({username: user.username, id: user.id});
         });
     })(req, res, next);
 });
 
-app.get('/', function(req, res){
-    res.send("hello");
+app.get('/', (req, res) => {
+    res.send("hello from get");
 });
 
-app.post('/', function(req, res){
-    res.send("nice post");
+app.post('/', (req, res) => {
+    res.send("test post");
 });
 
-passport.serializeUser(function(user, cb) {
-    cb(null, user.id);
-  });
+const checkAuthentication = (req,res,next) => {
+    if(req.isAuthenticated()){
+        return next();
+    } else{
+        return res.send('haxin?')
+    }
+}
+
+app.get('/queries',checkAuthentication, (req, res) => {
+    console.log(req);
+    return res.send(req.user.username);
+})
+
+passport.serializeUser((user, cb) => cb(null, user.id));
   
-  passport.deserializeUser(function(id, cb) {
-    models.User.find({where: {id: id}, include: [{model: models.Query}]}, function (err, user) {
-      if (err) { return cb(err); }
-      return cb(null, user); 
-    });
-  });
-  
+passport.deserializeUser(async (id, cb) => {
+    try {
+        let user = await models.User.findById(id) 
+        cb(null, user);
+    } catch(err) {
+        cb(err);
+    }
+});
 
 models.sequelize.sync({force: true}).then(() => {
     seed(models);
