@@ -74,6 +74,11 @@ app.post('/', (req, res) => {
     res.send("test post");
 });
 
+app.get('/logout', function(req, res){
+    req.logout();
+    res.send('logout successful');
+  });
+
 const checkAuthentication = (req,res,next) => {
     if(req.isAuthenticated()){
         return next();
@@ -83,8 +88,17 @@ const checkAuthentication = (req,res,next) => {
 }
 
 app.get('/queries',checkAuthentication, (req, res) => {
+
     console.log(req);
     return res.send(req.user.username);
+})
+
+app.post('/addquery', checkAuthentication,async (req, res) => {
+    console.log(req.body);
+    const {lat, lng, name} = req.body;
+    const userId = req.user.id;
+    const newQuery = await models.Query.create({name, latitude: lat, longitude: lng, userId});
+    return res.json({id: newQuery.id, name: newQuery.name});
 })
 
 passport.serializeUser((user, cb) => cb(null, user.id));
