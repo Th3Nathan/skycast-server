@@ -40,13 +40,14 @@ export default async ({User, Query}) => {
         tokyo = await Query.create(tokyo);
         montreal = await Query.create(montreal);
         bangkok = await Query.create(bangkok);
-        seoul = await Query.create(seoul);
-        await nathan.addQueries([tokyo.id, montreal.id, bangkok.id]);
+        seoul = await Query.create({...seoul, userId: nathan.id});
+        // await nathan.addQueries([tokyo.id, montreal.id, bangkok.id]);
         await priscilla.addQueries([seoul.id]);
         let me = await User.find(
             {where: {username: 'th3nathan'}, include: [{model: Query}]} 
         )
-        console.log(me.queries);
+        let quer = await nathan.getQueries();
+        console.log(quer);
     } catch (err) {
         return err;
     }

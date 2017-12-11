@@ -41,7 +41,7 @@ export default (sequelize, DataTypes) => {
 
     User.associate = function(models) {
         User.hasMany(models.Query, {
-            foreignKey: {name: 'queryId', field: 'query_id'}
+            foreignKey: {name: 'userId', field: 'user_id'}
         });
     }
     return User;

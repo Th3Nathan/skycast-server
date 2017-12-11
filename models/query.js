@@ -24,7 +24,7 @@ export default (sequelize, DataTypes) => {
 
     Query.associate = function(models) {
         Query.belongsTo(models.User, {
-            foreignKey: {name: 'queryId', field: 'query_id'}
+            foreignKey: {name: 'userId', field: 'user_id'}
         });
     }
     return Query;

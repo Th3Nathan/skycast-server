@@ -38,11 +38,12 @@ app.post('/signin', (req, res, next) => {
         if (!user) {
             return res.json({error: info.message});
         }
-        req.login(user, (err) => {
+        req.login(user, async (err) => {
             if (err) {
                 console.error(err);
                 return next(err);
             }
+            await user.getQueries();
             return res.json({username: user.username, queries: user.queries, id: user.id});
         });
     })(req, res, next);
