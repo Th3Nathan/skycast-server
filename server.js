@@ -5,11 +5,12 @@ import cors from 'cors';
 import session from 'express-session';
 import bodyParser from 'body-parser';
 import passport from './passport';
-import DarkSky from 'dark-sky';
+import axios from 'axios';
+// import DarkSky from 'dark-sky';
 import moment from 'moment';
 const PORT = process.env.PORT || 8080;
-const darkskyKey = process.env.DARKSKY_KEY || require('./secrets');
-const darksky = new DarkSky(darkskyKey);
+// const darkskyKey = process.env.DARKSKY_KEY || require('./secrets');
+// const darksky = new DarkSky(darkskyKey);
 
 const app = express(); 
 
@@ -23,7 +24,7 @@ app.use(passport.session());
 app.use(function (req, res, next) {
     
         // Website you wish to allow to connect
-        res.setHeader('Access-Control-Allow-Origin', 'http://nathanskycast.herokuapp.com');
+        res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
     
         // Request methods you wish to allow
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -96,16 +97,17 @@ const checkAuthentication = (req,res,next) => {
     }
 }
 
+const darksky = (lat, lng, time) => {
+    let key = process.env.DARKSKY_KEY || require('./secrets');
+    let url = `https://api.darksky.net/forecast/${key}/${lat},${lng}${time ? `,${time}` : ''}?lang=en&units=us&exclude=minutely`
+    return axios.get(url);
+  }
+
 app.post('/weather', async (req, res, next) => {
     const {lat, lng, name} = req.body;
     try {
-        const forecast = await darksky 
-            .options({
-                latitude: lat,
-                longitude: lng,
-                exclude: ['minutely'],
-            }).get();
-        res.status(200).json(forecast)
+        const forecast = await darksky(lat, lng);
+        res.status(200).json(forecast.data)
     } catch (e) {
         console.log(e);
         next(err);
@@ -114,27 +116,46 @@ app.post('/weather', async (req, res, next) => {
 
 app.post('/history', async (req, res, next) => {
     const {lat, lng, time} = req.body;
-    let options = {
-        latitude: lat,
-        longitude: lng,
-        exclude: ['minutely'],
-    };
     let oneWeekTimes = [];
     let startTime = moment(parseInt(time, 10), 'X');
     for (let i = 0; i <= 7; i++) {
         oneWeekTimes.push(startTime.add(1, 'days').unix());
     }
-    try {
-        let forecasts = [];
-        for (let time of oneWeekTimes) {
-            let data = await darksky.options({...options, time: moment(time, 'X').format('YYYY-MM-DD')}).get();
-            forecasts.push(data);
+
+    let promises = oneWeekTimes.map(dayTime => {
+        return () => {
+            return darksky(lat, lng, dayTime);
         }
+    })
+    try {
+        let forecasts = await Promise.all(promises);
         res.status(200).json(forecasts);
     } catch(err) {
         console.log(err);
         next(err);
     }
+
+    // let options = {
+    //     latitude: lat,
+    //     longitude: lng,
+    //     exclude: ['minutely'],
+    // };
+    // let oneWeekTimes = [];
+    // let startTime = moment(parseInt(time, 10), 'X');
+    // for (let i = 0; i <= 7; i++) {
+    //     oneWeekTimes.push(startTime.add(1, 'days').unix());
+    // }
+    // try {
+    //     let forecasts = [];
+    //     for (let time of oneWeekTimes) {
+    //         let data = await darksky.options({...options, time: moment(time, 'X').format('YYYY-MM-DD')}).get();
+    //         forecasts.push(data);
+    //     }
+    //     res.status(200).json(forecasts);
+    // } catch(err) {
+    //     console.log(err);
+    //     next(err);
+    // }
 })
 
 app.post('/addquery', checkAuthentication,async (req, res) => {
