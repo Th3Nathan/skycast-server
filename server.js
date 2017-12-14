@@ -5,8 +5,11 @@ import cors from 'cors';
 import session from 'express-session';
 import bodyParser from 'body-parser';
 import passport from './passport';
-
+import DarkSky from 'dark-sky';
+import moment from 'moment';
 const PORT = process.env.PORT || 8080;
+const darkskyKey = process.env.DARKSKY_KEY || require('./secrets');
+const darksky = new DarkSky(darkskyKey);
 
 const app = express(); 
 
@@ -24,11 +27,6 @@ res.header ('Access-Control-Allow-Credentials', true)
 res.header ('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
 next()
 })
-  
-app.get('/logout', function(req, res){
-    req.logout();
-    res.redirect('/');
-});
 
 app.post('/signin', (req, res, next) => {
     passport.authenticate('signin', (err, user, info) => {
@@ -67,14 +65,6 @@ app.post('/signup', (req, res, next) => {
     })(req, res, next);
 });
 
-app.get('/', (req, res) => {
-    res.send("hello from get");
-});
-
-app.post('/', (req, res) => {
-    res.send("test post");
-});
-
 app.get('/logout', function(req, res){
     req.logout();
     res.send('logout successful');
@@ -88,10 +78,45 @@ const checkAuthentication = (req,res,next) => {
     }
 }
 
-app.get('/queries',checkAuthentication, (req, res) => {
+app.post('/weather', async (req, res, next) => {
+    const {lat, lng, name} = req.body;
+    try {
+        const forecast = await darksky 
+            .options({
+                latitude: lat,
+                longitude: lng,
+                exclude: ['minutely'],
+            }).get();
+        res.status(200).json(forecast)
+    } catch (e) {
+        console.log(e);
+        next(err);
+    }
+})
 
-    console.log(req);
-    return res.send(req.user.username);
+app.post('/history', async (req, res, next) => {
+    const {lat, lng, time} = req.body;
+    let options = {
+        latitude: lat,
+        longitude: lng,
+        exclude: ['minutely'],
+    };
+    let oneWeekTimes = [];
+    let startTime = moment(parseInt(time, 10), 'X');
+    for (let i = 0; i <= 7; i++) {
+        oneWeekTimes.push(startTime.add(1, 'days').unix());
+    }
+    try {
+        let forecasts = [];
+        for (let time of oneWeekTimes) {
+            let data = await darksky.options({...options, time: moment(time, 'X').format('YYYY-MM-DD')}).get();
+            forecasts.push(data);
+        }
+        res.status(200).json(forecasts);
+    } catch(err) {
+        console.log(err);
+        next(err);
+    }
 })
 
 app.post('/addquery', checkAuthentication,async (req, res) => {

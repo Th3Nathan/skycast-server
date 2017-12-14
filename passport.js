@@ -40,10 +40,7 @@ passport.use(
             if (existing) {
                 return done(null, false, { message: 'User already exists.' });
             }
-
             try {
-                console.log("LDSJFSLDKJFLKSDJFS")
-                console.log(password);
                 const user = await models.User.create({username, password});
                 return done(null, user);
             } catch(err){
