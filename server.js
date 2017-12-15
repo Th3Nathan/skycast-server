@@ -1,51 +1,31 @@
 import express from 'express';
 import models from './models';
 import seed from './seed';
-import cors from 'cors';
 import session from 'express-session';
 import bodyParser from 'body-parser';
 import passport from './passport';
 import axios from 'axios';
-// import DarkSky from 'dark-sky';
 import moment from 'moment';
 const PORT = process.env.PORT || 8080;
-// const darkskyKey = process.env.DARKSKY_KEY || require('./secrets');
-// const darksky = new DarkSky(darkskyKey);
 
 const app = express(); 
 
 app.use(express.static("public"));
 app.use(session({ secret: "secret123" }));
-
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+let clientUrl = process.env.NODE_ENV === 'production' ? 'http://nathanskycast.herokuapp.com' : 'http://localhost:3000';
+
 app.use(function (req, res, next) {
-    
-        // Website you wish to allow to connect
-        res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
-    
-        // Request methods you wish to allow
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    
-        // Request headers you wish to allow
-        res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-    
-        // Set to true if you need the website to include cookies in the requests sent
-        // to the API (e.g. in case you use sessions)
-        res.setHeader('Access-Control-Allow-Credentials', true);
-    
-        // Pass to next layer of middleware
-        next();
-    });
-// app.use((req, res, next) =>{
-// res.header ('Access-Control-Allow-Origin', 'http://localhost:3000, http://nathanskycast.herokuapp.com')
-// res.header ('Access-Control-Allow-Headers', 'Origin, X-Requested-With, X-AUTHENTICATION, X-IP, Content-Type, Accept')
-// res.header ('Access-Control-Allow-Credentials', true)
-// res.header ('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-// next()
-// })
+    res.setHeader('Access-Control-Allow-Origin', clientUrl);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    next();
+});
 
 app.post('/signin', (req, res, next) => {
     passport.authenticate('signin', (err, user, info) => {
@@ -101,7 +81,7 @@ const darksky = (lat, lng, time) => {
     let key = process.env.DARKSKY_KEY || require('./secrets');
     let url = `https://api.darksky.net/forecast/${key}/${lat},${lng}${time ? `,${time}` : ''}?lang=en&units=us&exclude=minutely`
     return axios.get(url);
-  }
+}
 
 app.post('/weather', async (req, res, next) => {
     const {lat, lng, name} = req.body;
@@ -118,44 +98,18 @@ app.post('/history', async (req, res, next) => {
     const {lat, lng, time} = req.body;
     let oneWeekTimes = [];
     let startTime = moment(parseInt(time, 10), 'X');
-    for (let i = 0; i <= 7; i++) {
+    oneWeekTimes.push(startTime.unix());
+    for (let i = 0; i < 7; i++) {
         oneWeekTimes.push(startTime.add(1, 'days').unix());
     }
-
-    let promises = oneWeekTimes.map(dayTime => {
-        return () => {
-            return darksky(lat, lng, dayTime);
-        }
-    })
+    let promises = oneWeekTimes.map(dayTime => darksky(lat, lng, dayTime))
     try {
         let forecasts = await Promise.all(promises);
-        res.status(200).json(forecasts);
+        res.status(200).json(forecasts.map(forecast => forecast.data));
     } catch(err) {
         console.log(err);
         next(err);
     }
-
-    // let options = {
-    //     latitude: lat,
-    //     longitude: lng,
-    //     exclude: ['minutely'],
-    // };
-    // let oneWeekTimes = [];
-    // let startTime = moment(parseInt(time, 10), 'X');
-    // for (let i = 0; i <= 7; i++) {
-    //     oneWeekTimes.push(startTime.add(1, 'days').unix());
-    // }
-    // try {
-    //     let forecasts = [];
-    //     for (let time of oneWeekTimes) {
-    //         let data = await darksky.options({...options, time: moment(time, 'X').format('YYYY-MM-DD')}).get();
-    //         forecasts.push(data);
-    //     }
-    //     res.status(200).json(forecasts);
-    // } catch(err) {
-    //     console.log(err);
-    //     next(err);
-    // }
 })
 
 app.post('/addquery', checkAuthentication,async (req, res) => {
